@@ -8,4 +8,7 @@ typechain-types
 #Hardhat files
 cache
 artifacts
+ignition/deployments
 
+# Hardhat 3 keystore (encrypted config variables, if used instead of .env)
+.hardhat-keystore.json
