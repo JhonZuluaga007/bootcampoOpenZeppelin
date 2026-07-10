@@ -23,11 +23,10 @@ import {IGoldReserveOracle} from "./interfaces/IGoldReserveOracle.sol";
 /// No ReentrancyGuardUpgradeable variant is published for OpenZeppelin
 /// Contracts (Upgradeable) v5.x — this is the maintainers' current
 /// recommended replacement for upgradeable contracts.
-/// @dev Design decision: {pause} (added in a later phase) only gates
-/// {mint} — it is the circuit breaker's "stop new issuance" lever, not a
-/// full token freeze. Transfers and {burn}/redemption are never blocked by
-/// pause, so holders can always exit even while an incident is being
-/// investigated.
+/// @dev Design decision: {pause} only gates {mint} — it is the circuit
+/// breaker's "stop new issuance" lever, not a full token freeze. Transfers
+/// and {burn}/redemption are never blocked by pause, so holders can always
+/// exit even while an incident is being investigated.
 contract AuroPeg is
     ERC20Upgradeable,
     AccessControlUpgradeable,
@@ -158,6 +157,20 @@ contract AuroPeg is
     /// display purposes — never consulted by {mint}'s circuit breaker.
     function getGoldPriceUSD() external view returns (int256 price, uint256 updatedAt) {
         (, price, , updatedAt,) = xauUsdPriceFeed.latestRoundData();
+    }
+
+    /// @notice Halts {mint} — the circuit breaker's manual or
+    /// monitor-triggered "stop new issuance" lever. Does not affect
+    /// transfers or {burn}.
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    /// @notice Resumes {mint}. Restricted to {UNPAUSER_ROLE}, which is
+    /// deliberately never granted to the off-chain monitor's keeper
+    /// account — unpausing is always a manual, human decision.
+    function unpause() external onlyRole(UNPAUSER_ROLE) {
+        _unpause();
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
