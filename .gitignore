@@ -4,6 +4,7 @@ coverage
 coverage.json
 typechain
 typechain-types
+types/ethers-contracts
 
 #Hardhat files
 cache
