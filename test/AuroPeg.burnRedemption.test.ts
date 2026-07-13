@@ -74,8 +74,19 @@ describe("AuroPeg burn / redemption", function () {
       );
 
       await expect(
-        auroPeg.connect(other).burn(mintedAmount + 1n),
+        auroPeg.connect(other).burn(mintedAmount + 10n ** 18n),
       ).to.be.revertedWithCustomError(auroPeg, "ERC20InsufficientBalance");
+    });
+
+    it("reverts when burning an amount that is not a whole gram", async function () {
+      const { auroPeg, other } = await networkHelpers.loadFixture(
+        deployWithBalanceFixture,
+      );
+      const fractionalAmount = 10n ** 18n + 1n; // 1 gram + 1 wei
+
+      await expect(auroPeg.connect(other).burn(fractionalAmount))
+        .to.be.revertedWithCustomError(auroPeg, "InvalidBurnAmount")
+        .withArgs(fractionalAmount);
     });
 
     it("cannot burn another account's balance", async function () {
@@ -96,15 +107,18 @@ describe("AuroPeg burn / redemption", function () {
       const totalSupply = await auroPeg.totalSupply();
       const remainingCapacity = available - totalSupply;
 
+      const oneGram = 10n ** 18n;
+
       // Minting past the remaining capacity reverts...
       await expect(
-        auroPeg.connect(admin).mint(monitor.address, remainingCapacity + 1n),
+        auroPeg.connect(admin).mint(monitor.address, remainingCapacity + oneGram),
       ).to.be.revertedWithCustomError(auroPeg, "InsufficientReserves");
 
-      // ...until a burn frees up exactly enough room.
-      await auroPeg.connect(other).burn(1n);
+      // ...until a burn frees up exactly enough room (in whole-gram steps,
+      // since burn only accepts multiples of 1e18).
+      await auroPeg.connect(other).burn(oneGram);
       await expect(
-        auroPeg.connect(admin).mint(monitor.address, remainingCapacity + 1n),
+        auroPeg.connect(admin).mint(monitor.address, remainingCapacity + oneGram),
       ).to.not.revert(ethers);
     });
   });

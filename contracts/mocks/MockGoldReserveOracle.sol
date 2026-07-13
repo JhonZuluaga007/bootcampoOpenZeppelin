@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IGoldReserveOracle} from "../interfaces/IGoldReserveOracle.sol";
@@ -12,7 +13,11 @@ import {IGoldReserveOracle} from "../interfaces/IGoldReserveOracle.sol";
 /// The reported `answer` is the custodied gold reserve, denominated in
 /// grams, at the same 8-decimal precision Chainlink uses for its own
 /// feeds (see {decimals}).
-contract MockGoldReserveOracle is IGoldReserveOracle, Ownable {
+/// @dev Uses the two-step `Ownable2Step` ownership handoff (propose then
+/// accept) rather than plain `Ownable`, so a mistyped or unreachable
+/// address can never be handed exclusive control of {setReserve} by a
+/// single mistaken transaction.
+contract MockGoldReserveOracle is IGoldReserveOracle, Ownable2Step {
     uint8 private constant DECIMALS = 8;
     string private constant DESCRIPTION = "AuroPeg Mock Gold Reserve Oracle (grams, testnet only)";
     uint256 private constant VERSION = 1;

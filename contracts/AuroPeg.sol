@@ -58,8 +58,28 @@ contract AuroPeg is
     /// than a typical Chainlink price-feed heartbeat.
     uint256 public constant MAX_RESERVE_STALENESS = 1 days;
 
+    /// @notice Maximum age, in seconds, an {xauUsdPriceFeed} round may
+    /// have before {getGoldPriceUSD} flags it as stale. Matches the real
+    /// Chainlink XAU/USD feed's published heartbeat on Sepolia (3600s),
+    /// unlike {MAX_RESERVE_STALENESS} — the price feed is purely
+    /// informational, so a stale reading is reported, never reverted on.
+    uint256 public constant MAX_PRICE_STALENESS = 1 hours;
+
+    /// @dev Reserved storage slots for variables added by future upgrades
+    /// without shifting the layout of anything declared above. Sized at
+    /// 50 by the same community convention OpenZeppelin's own pre-v5
+    /// upgradeable contracts used; shrink this array by one slot for
+    /// every new variable a future version adds here.
+    uint256[50] private __gap;
+
     error ZeroAddress();
     error ZeroAmount();
+
+    /// @notice Thrown by {burn} when `amount` is not a whole gram
+    /// (a multiple of 1e18). Physical redemption cannot ship a gram
+    /// fraction, so a sub-gram remainder would otherwise be destroyed
+    /// on-chain with no corresponding physical claim.
+    error InvalidBurnAmount(uint256 amount);
 
     /// @notice Thrown by {mint} when minting `requested` total supply
     /// would exceed the `available` reserve, both in 18-decimal token
@@ -69,6 +89,12 @@ contract AuroPeg is
     /// @notice Thrown when {goldReserveOracle}'s latest round is missing,
     /// non-positive, or older than {MAX_RESERVE_STALENESS}.
     error StaleReserveData();
+
+    /// @notice Emitted once in {initialize} when {goldReserveOracle} is set.
+    event GoldReserveOracleSet(address indexed oracle);
+
+    /// @notice Emitted once in {initialize} when {xauUsdPriceFeed} is set.
+    event PriceFeedSet(address indexed priceFeed);
 
     /// @notice Emitted when a holder burns their own balance to request
     /// off-chain physical redemption of the underlying gold.
@@ -100,6 +126,8 @@ contract AuroPeg is
 
         goldReserveOracle = IGoldReserveOracle(goldReserveOracle_);
         xauUsdPriceFeed = AggregatorV3Interface(xauUsdPriceFeed_);
+        emit GoldReserveOracleSet(goldReserveOracle_);
+        emit PriceFeedSet(xauUsdPriceFeed_);
 
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(MINTER_ROLE, defaultAdmin);
@@ -127,13 +155,16 @@ contract AuroPeg is
     /// @notice Burns `amount` from the caller's own balance to request
     /// off-chain physical redemption. Never gated by {pause} — holders can
     /// always exit their position.
-    /// @dev `gramsOfGold` in {RedemptionRequested} is a plain integer gram
-    /// count (`amount / 1e18`), relying directly on the 1-token-equals-
-    /// 1-gram invariant rather than the oracle's own decimal precision —
-    /// any sub-gram remainder is dropped, which matches how a physical
-    /// redemption (whole gold units) would be processed off-chain.
+    /// @dev Reverts with {InvalidBurnAmount} unless `amount` is a whole
+    /// gram (a multiple of 1e18): physical redemption can only ship whole
+    /// gold units, so a sub-gram remainder is never accepted for burning.
+    /// A holder with a fractional balance (from an ordinary transfer) can
+    /// still transfer it freely — it simply isn't redeemable until it's
+    /// topped up to a whole gram. `gramsOfGold` in {RedemptionRequested}
+    /// is therefore always an exact conversion (`amount / 1e18`).
     function burn(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
+        if (amount % 1e18 != 0) revert InvalidBurnAmount(amount);
 
         _burn(msg.sender, amount);
 
@@ -155,8 +186,14 @@ contract AuroPeg is
 
     /// @notice Informational Chainlink XAU/USD spot price. Purely for
     /// display purposes — never consulted by {mint}'s circuit breaker.
-    function getGoldPriceUSD() external view returns (int256 price, uint256 updatedAt) {
+    /// @dev Never reverts, even on a stale or non-positive reading: it's a
+    /// read-only display value, so `isStale` is returned for the caller
+    /// (e.g. a front-end) to decide how to present it, rather than the
+    /// hard revert-on-stale behavior {currentReserves} uses for the
+    /// reserve oracle that actually gates minting.
+    function getGoldPriceUSD() external view returns (int256 price, uint256 updatedAt, bool isStale) {
         (, price, , updatedAt,) = xauUsdPriceFeed.latestRoundData();
+        isStale = price <= 0 || block.timestamp - updatedAt > MAX_PRICE_STALENESS;
     }
 
     /// @notice Halts {mint} — the circuit breaker's manual or
