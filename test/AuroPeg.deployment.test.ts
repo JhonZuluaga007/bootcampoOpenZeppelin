@@ -40,6 +40,43 @@ describe("AuroPeg deployment & initialization", function () {
     });
   });
 
+  describe("Initialization events", function () {
+    it("emits GoldReserveOracleSet and PriceFeedSet during initialize", async function () {
+      const { goldReserveOracle, xauUsdPriceFeed, admin } =
+        await networkHelpers.loadFixture(deployAuroPegFixture);
+      const oracleAddress = await goldReserveOracle.getAddress();
+      const priceFeedAddress = await xauUsdPriceFeed.getAddress();
+      const AuroPeg = await ethers.getContractFactory("AuroPeg");
+
+      const freshAuroPeg = await upgrades.deployProxy(
+        AuroPeg,
+        [TOKEN_NAME, TOKEN_SYMBOL, admin.address, oracleAddress, priceFeedAddress],
+        { kind: "uups" },
+      );
+      const deploymentTx = freshAuroPeg.deploymentTransaction();
+      if (!deploymentTx) {
+        throw new Error("expected a deployment transaction");
+      }
+      const receipt = await deploymentTx.wait();
+      if (!receipt) {
+        throw new Error("expected a deployment receipt");
+      }
+
+      const emittedEventNames = receipt.logs
+        .map((log) => {
+          try {
+            return freshAuroPeg.interface.parseLog(log)?.name;
+          } catch {
+            return undefined;
+          }
+        })
+        .filter((name): name is string => Boolean(name));
+
+      expect(emittedEventNames).to.include("GoldReserveOracleSet");
+      expect(emittedEventNames).to.include("PriceFeedSet");
+    });
+  });
+
   describe("Role assignment", function () {
     it("grants the default admin every role", async function () {
       const { auroPeg, admin } = await networkHelpers.loadFixture(

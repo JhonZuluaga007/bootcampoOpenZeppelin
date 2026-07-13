@@ -118,6 +118,21 @@ describe("MockGoldReserveOracle", function () {
     });
   });
 
+  describe("Ownable2Step ownership transfer", function () {
+    it("requires the new owner to accept before ownership actually transfers", async function () {
+      const { oracle, admin, other } = await networkHelpers.loadFixture(
+        deployMockOracleFixture,
+      );
+
+      await oracle.connect(admin).transferOwnership(other.address);
+      expect(await oracle.owner()).to.equal(admin.address);
+      expect(await oracle.pendingOwner()).to.equal(other.address);
+
+      await oracle.connect(other).acceptOwnership();
+      expect(await oracle.owner()).to.equal(other.address);
+    });
+  });
+
   describe("simulateReserveDrop", function () {
     it("is callable by anyone and shrinks the reserve by the given bps", async function () {
       const { oracle, other } = await networkHelpers.loadFixture(

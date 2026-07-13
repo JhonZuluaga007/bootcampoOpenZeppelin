@@ -4,6 +4,8 @@ import {
   networkHelpers,
 } from "./helpers/fixtures.js";
 
+const ONE_HOUR = 60 * 60;
+
 // Mock-backed suite for the informational XAU/USD price feed. This is the
 // primary, always-run coverage for getGoldPriceUSD(); the optional
 // test/AuroPeg.priceFeed.fork.test.ts additionally checks the real
@@ -30,6 +32,28 @@ describe("AuroPeg XAU/USD price feed (mock)", function () {
 
     expect(price).to.equal(expectedAnswer);
     expect(updatedAt).to.equal(expectedUpdatedAt);
+  });
+
+  it("reports isStale = false right after a fresh update", async function () {
+    const { auroPeg } = await networkHelpers.loadFixture(
+      deployAuroPegFixture,
+    );
+
+    const [, , isStale] = await auroPeg.getGoldPriceUSD();
+    expect(isStale).to.be.false;
+  });
+
+  it("reports isStale = true once the reading is older than MAX_PRICE_STALENESS, without reverting", async function () {
+    const { auroPeg } = await networkHelpers.loadFixture(
+      deployAuroPegFixture,
+    );
+    const maxPriceStaleness = await auroPeg.MAX_PRICE_STALENESS();
+    expect(maxPriceStaleness).to.equal(BigInt(ONE_HOUR));
+
+    await networkHelpers.time.increase(Number(maxPriceStaleness) + 1);
+
+    const [, , isStale] = await auroPeg.getGoldPriceUSD();
+    expect(isStale).to.be.true;
   });
 
   it("reflects a price update on the next call", async function () {
