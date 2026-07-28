@@ -16,10 +16,7 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 /// `PAUSER_ROLE`, and `UNPAUSER_ROLE` are untouched and stay instant — see
 /// the "Design Decisions" section of the README for the full rationale.
 contract AuroPegTimelock is TimelockController {
-    constructor(
-        uint256 minDelay,
-        address[] memory proposers,
-        address[] memory executors,
-        address admin
-    ) TimelockController(minDelay, proposers, executors, admin) {}
+    constructor(uint256 minDelay, address[] memory proposers, address[] memory executors, address admin)
+        TimelockController(minDelay, proposers, executors, admin)
+    {}
 }

@@ -16,16 +16,22 @@ It is Project 1 of a three-part open-source portfolio initiative:
 
 ## Requirements
 
-- Node.js `>=22.13.0` (see `.nvmrc` — run `nvm use`)
-- npm
+- [Foundry](https://book.getfoundry.sh/) (`forge`, `cast`, `anvil`) — install
+  via `foundryup`
+- Node.js `>=22.13.0` (see `.nvmrc` — run `nvm use`) and npm — only needed as
+  the runtime for `@openzeppelin/upgrades-core`, which
+  `openzeppelin-foundry-upgrades` shells out to (via `ffi`) to validate UUPS
+  storage-layout safety on every deploy/upgrade
 
 ## Setup
 
 ```shell
-npm install
-cp .env.example .env   # fill in SEPOLIA_RPC_URL, PRIVATE_KEY, ETHERSCAN_API_KEY
-npx hardhat compile
-npx hardhat test
+foundryup
+forge install
+npm install             # installs @openzeppelin/upgrades-core
+cp .env.example .env    # fill in SEPOLIA_RPC_URL, PRIVATE_KEY, ETHERSCAN_API_KEY
+forge build
+forge test
 ```
 
 ## Architecture
@@ -61,7 +67,7 @@ npx hardhat test
 
 `MINTER_ROLE`, `PAUSER_ROLE`, and `UNPAUSER_ROLE` are deliberately kept
 outside the timelock — they're granted directly to operational addresses
-(see `scripts/grantRoles.ts`) so day-to-day minting and the emergency pause
+(see `script/GrantRoles.s.sol`) so day-to-day minting and the emergency pause
 lever stay instant. Only upgrades and role administration go through the
 timelock's mandatory delay.
 
@@ -83,8 +89,8 @@ timelock's mandatory delay.
   and never granted to the off-chain monitor's keeper account (which may
   hold `PAUSER_ROLE` to auto-pause on a reserve drop). This makes "the
   monitor can never unpause" a testable access-control fact, not just a
-  convention — see `test/AuroPeg.accessControl.test.ts` and
-  `test/AuroPeg.pauseUnpause.test.ts`.
+  convention — see `test/AuroPeg.accessControl.t.sol` and
+  `test/AuroPeg.pauseUnpause.t.sol`.
 - **Whole-gram burns** — `burn()` requires `amount` to be a multiple of
   `1e18` (one full gram), reverting with `InvalidBurnAmount` otherwise.
   Physical redemption can't ship a fraction of a gram, so a sub-gram
@@ -104,7 +110,7 @@ timelock's mandatory delay.
   future upgrade that inserts (not just appends) a variable can't collide
   with the existing storage layout.
 - **`TimelockController` for `DEFAULT_ADMIN_ROLE`** — after
-  `scripts/deployTimelock.ts` runs, upgrading the contract or changing
+  `script/DeployTimelock.s.sol` runs, upgrading the contract or changing
   role membership requires a scheduled operation and a mandatory delay
   (2 days by default). This mitigates the single-EOA centralization risk
   flagged in the Phase 5.5 security audit without touching day-to-day
@@ -136,7 +142,7 @@ timelock's mandatory delay.
   demo (or a test) can trigger a reserve-drop scenario without owner keys.
   A production PoR oracle would never expose this.
 - **The demo timelock defaults to a single EOA** as both proposer and
-  executor for simplicity (`scripts/deployTimelock.ts`). A real production
+  executor for simplicity (`script/DeployTimelock.s.sol`). A real production
   setup should use a multisig (e.g. Safe) in that role, not a single key.
 
 ## Security
@@ -171,63 +177,70 @@ and `docs/prs/phase-5-5-security-audit-hardening.md`.
 
 | File | Covers | Tests |
 |---|---|---|
-| `AuroPeg.deployment.test.ts` | Deployment, initialization, zero-address guards, re-init protection | 11 |
-| `AuroPeg.minting.test.ts` | Mint happy path, access control, input validation | 8 |
-| `AuroPeg.circuitBreaker.test.ts` | Decimal conversion, reserve boundaries, staleness edge cases | 8 |
-| `AuroPeg.reserveDrop.test.ts` | Reserve-drop scenario, manual incident response | 6 |
-| `AuroPeg.pauseUnpause.test.ts` | Pause/unpause access control and effects on mint/burn/transfer | 11 |
-| `AuroPeg.burnRedemption.test.ts` | Burn/redemption, whole-gram enforcement | 8 |
-| `AuroPeg.accessControl.test.ts` | Full access-control sweep across every restricted function | 8 |
-| `AuroPeg.upgrade.test.ts` | UUPS upgrade safety, storage preservation | 5 |
-| `AuroPeg.e2e.test.ts` | Full multi-user, multi-incident narrative scenario | 1 |
-| `AuroPeg.priceFeed.test.ts` | XAU/USD price feed (mock-backed, always runs) | 8 |
-| `AuroPeg.priceFeed.fork.test.ts` | XAU/USD price feed against the real Sepolia feed (optional) | 1 (skipped by default) |
-| `AuroPeg.timelock.test.ts` | `DEFAULT_ADMIN_ROLE` timelock handover and delayed execution | 9 |
-| `MockGoldReserveOracle.test.ts` | Mock oracle unit tests | 12 |
+| `AuroPeg.deployment.t.sol` | Deployment, initialization, zero-address guards, re-init protection | 11 |
+| `AuroPeg.minting.t.sol` | Mint happy path, access control, input validation | 8 |
+| `AuroPeg.circuitBreaker.t.sol` | Decimal conversion, reserve boundaries, staleness edge cases | 8 |
+| `AuroPeg.reserveDrop.t.sol` | Reserve-drop scenario, manual incident response | 6 |
+| `AuroPeg.pauseUnpause.t.sol` | Pause/unpause access control and effects on mint/burn/transfer | 11 |
+| `AuroPeg.burnRedemption.t.sol` | Burn/redemption, whole-gram enforcement | 8 |
+| `AuroPeg.accessControl.t.sol` | Full access-control sweep across every restricted function | 8 |
+| `AuroPeg.upgrade.t.sol` | UUPS upgrade safety, storage preservation | 5 |
+| `AuroPeg.e2e.t.sol` | Full multi-user, multi-incident narrative scenario | 1 |
+| `AuroPeg.priceFeed.t.sol` | XAU/USD price feed (mock-backed, always runs) | 8 |
+| `AuroPeg.priceFeed.fork.t.sol` | XAU/USD price feed against the real Sepolia feed (optional) | 1 (skipped by default) |
+| `AuroPeg.timelock.t.sol` | `DEFAULT_ADMIN_ROLE` timelock handover and delayed execution | 9 |
+| `MockGoldReserveOracle.t.sol` | Mock oracle unit tests | 12 |
 
 ```shell
-npx hardhat test              # full suite, fork test skipped by default
-npx hardhat coverage          # coverage report
-SEPOLIA_RPC_URL=... npx hardhat test test/AuroPeg.priceFeed.fork.test.ts   # optional, against the real feed
+forge test                    # full suite, fork test skipped by default
+forge coverage                 # coverage report
+SEPOLIA_RPC_URL=... forge test --match-path test/AuroPeg.priceFeed.fork.t.sol   # optional, against the real feed
 ```
+
+Note: `forge` does not auto-load `.env` the way Hardhat's `dotenv/config` did
+— `source .env` before any command that needs `SEPOLIA_RPC_URL`,
+`PRIVATE_KEY`, or `ETHERSCAN_API_KEY`.
 
 ## Deployment (Sepolia)
 
 ```shell
+source .env   # load SEPOLIA_RPC_URL, PRIVATE_KEY, ETHERSCAN_API_KEY
+
 # 1. Deploy the full stack: reserve oracle + price feed + AuroPeg proxy.
-npm run deploy:sepolia
+forge script script/Deploy.s.sol:Deploy --rpc-url sepolia --broadcast --verify
 # -> prints AUROPEG_ADDRESS, AUROPEG_IMPLEMENTATION_ADDRESS, and the oracle addresses.
 
-# 2. Verify the implementation contract on Etherscan.
-npx hardhat verify --network sepolia <AUROPEG_IMPLEMENTATION_ADDRESS>
+# 2. Verify the implementation contract on Etherscan (if --verify above didn't
+#    already do it, or for a later implementation-only redeploy).
+forge verify-contract <AUROPEG_IMPLEMENTATION_ADDRESS> contracts/AuroPeg.sol:AuroPeg --chain sepolia
 # Etherscan auto-detects the ERC1967 proxy once the implementation is
 # verified; if it doesn't, use the "Is this a proxy?" tool on the proxy
 # address's Etherscan page to link them manually.
 
 # 3. Delegate operational roles away from the deployer.
 MINTER_ADDRESS=0x... MONITOR_PAUSER_ADDRESS=0x... AUROPEG_ADDRESS=<proxy> \
-  npm run grant-roles:sepolia
+  forge script script/GrantRoles.s.sol:GrantRoles --rpc-url sepolia --broadcast
 
 # 4. Hand DEFAULT_ADMIN_ROLE to a timelock (mitigates I-01; see Security).
-AUROPEG_ADDRESS=<proxy> npm run deploy-timelock:sepolia
+AUROPEG_ADDRESS=<proxy> forge script script/DeployTimelock.s.sol:DeployTimelock --rpc-url sepolia --broadcast
 # -> prints TIMELOCK_ADDRESS. From this point on, upgrades and role
 #    changes must go through the timelock's schedule()/execute() flow.
 ```
 
-Environment variables read by the scripts (all optional except
-`AUROPEG_ADDRESS` where noted; unset ones fall back to sensible demo
-defaults):
+Environment variables read by the scripts (required ones are marked below;
+the rest fall back to sensible demo defaults when unset):
 
 | Variable | Used by | Default |
 |---|---|---|
-| `ADMIN_ADDRESS` | `deploy.ts` | the deployer |
-| `INITIAL_RESERVE_GRAMS` | `deploy.ts`, `deployMockOracle.ts` | 1,000,000 g |
-| `PRICE_FEED_ADDRESS` | `deploy.ts` | real Chainlink XAU/USD on Sepolia, a mock elsewhere |
-| `MINTER_ADDRESS`, `MONITOR_PAUSER_ADDRESS` | `grantRoles.ts` | unset (no-op if both unset) |
-| `AUROPEG_ADDRESS` | `grantRoles.ts`, `deployTimelock.ts`, `upgrade.ts` | **required** |
-| `TIMELOCK_MIN_DELAY_SECONDS` | `deployTimelock.ts` | 172800 (2 days) |
-| `TIMELOCK_PROPOSER_ADDRESS`, `TIMELOCK_EXECUTOR_ADDRESS` | `deployTimelock.ts` | the deployer |
-| `NEW_IMPLEMENTATION_NAME` | `upgrade.ts` | `AuroPeg` (edit before a real upgrade) |
+| `ADMIN_ADDRESS` | `Deploy.s.sol` | the deployer |
+| `INITIAL_RESERVE_GRAMS` | `Deploy.s.sol`, `DeployMockOracle.s.sol` | 1,000,000 g |
+| `PRICE_FEED_ADDRESS` | `Deploy.s.sol` | real Chainlink XAU/USD on Sepolia, a mock elsewhere |
+| `MINTER_ADDRESS`, `MONITOR_PAUSER_ADDRESS` | `GrantRoles.s.sol` | unset (no-op if both unset) |
+| `AUROPEG_ADDRESS` | `GrantRoles.s.sol`, `DeployTimelock.s.sol`, `Upgrade.s.sol` | **required** |
+| `TIMELOCK_MIN_DELAY_SECONDS` | `DeployTimelock.s.sol` | 172800 (2 days) |
+| `TIMELOCK_PROPOSER_ADDRESS`, `TIMELOCK_EXECUTOR_ADDRESS` | `DeployTimelock.s.sol` | the deployer |
+| `NEW_IMPLEMENTATION_NAME` | `Upgrade.s.sol` | **required** — the OpenZeppelin Foundry Upgrades plugin refuses to validate a contract against itself as a storage-layout reference, so there's no safe no-op default; point this at a real new implementation contract carrying a `@custom:oz-upgrades-from` annotation |
+| `PRIVATE_KEY` | every script | **required** — the deployer/broadcaster key |
 
 Reconfirm the real Chainlink XAU/USD feed address
 (`0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea`) against
@@ -244,7 +257,8 @@ deployment._
 
 Built in phases, each with a corresponding GitHub-issue-style spec and a
 PR description under `docs/issues/` and `docs/prs/`, including a dedicated
-security-audit phase (5.5) run before this final phase.
+security-audit phase (5.5) and a toolchain migration from Hardhat to
+Foundry (Phase 7) after the contracts, tests, and scripts were feature-complete.
 
 ## License
 

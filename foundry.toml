@@ -1,0 +1,42 @@
+[profile.default]
+src = "contracts"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]
+
+solc_version = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+
+# Required by OpenZeppelin/openzeppelin-foundry-upgrades — it shells out
+# (via ffi) to a Node.js script backed by @openzeppelin/upgrades-core to
+# validate UUPS storage-layout safety on every deployUUPSProxy/upgradeProxy
+# call, and reads the solc build-info/AST/storageLayout JSON it needs from
+# ./out and ./cache.
+ffi = true
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
+
+fs_permissions = [
+  { access = "read", path = "./out" },
+  { access = "read", path = "./cache" },
+]
+
+remappings = [
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+  "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+  "@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/",
+  "forge-std/=lib/forge-std/src/",
+  "openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/",
+]
+
+[rpc_endpoints]
+sepolia = "${SEPOLIA_RPC_URL}"
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}", chain = "sepolia" }
+
+[fmt]
+line_length = 120

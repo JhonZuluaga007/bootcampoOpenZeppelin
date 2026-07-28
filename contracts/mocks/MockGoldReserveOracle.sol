@@ -81,13 +81,7 @@ contract MockGoldReserveOracle is IGoldReserveOracle, Ownable2Step {
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
         require(_roundId > 0 && _roundId <= latestRoundId, "MockGoldReserveOracle: no data present");
-        return (
-            _roundId,
-            answers[_roundId],
-            startedAtTimestamps[_roundId],
-            updatedAtTimestamps[_roundId],
-            _roundId
-        );
+        return (_roundId, answers[_roundId], startedAtTimestamps[_roundId], updatedAtTimestamps[_roundId], _roundId);
     }
 
     /// @inheritdoc AggregatorV3Interface

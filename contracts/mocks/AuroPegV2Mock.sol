@@ -5,12 +5,13 @@ import {AuroPeg} from "../AuroPeg.sol";
 
 /// @title AuroPegV2Mock
 /// @notice Minimal UUPS upgrade target used only by
-/// `test/AuroPeg.upgrade.test.ts` to prove that upgrading `AuroPeg`
+/// `test/AuroPeg.upgrade.t.sol` to prove that upgrading `AuroPeg`
 /// preserves storage and keeps role-gating intact. Never deployed to any
 /// real network. Inherits `AuroPeg` directly (rather than redeclaring its
 /// base contracts) so its storage layout is `AuroPeg`'s layout with one
 /// new variable appended — the additive layout shape the OpenZeppelin
 /// Upgrades plugin expects when validating an upgrade.
+/// @custom:oz-upgrades-from AuroPeg
 contract AuroPegV2Mock is AuroPeg {
     /// @notice New storage slot appended after V1's layout.
     uint256 public upgradeMarker;
