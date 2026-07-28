@@ -18,7 +18,10 @@
     "test": "hardhat test",
     "coverage": "hardhat coverage",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
-    "grant-roles:sepolia": "hardhat run scripts/grantRoles.ts --network sepolia"
+    "deploy-mock-oracle:sepolia": "hardhat run scripts/deployMockOracle.ts --network sepolia",
+    "deploy-timelock:sepolia": "hardhat run scripts/deployTimelock.ts --network sepolia",
+    "grant-roles:sepolia": "hardhat run scripts/grantRoles.ts --network sepolia",
+    "upgrade:sepolia": "hardhat run scripts/upgrade.ts --network sepolia"
   },
   "devDependencies": {
     "@chainlink/contracts": "1.5.0",
