@@ -177,7 +177,7 @@ contract AuroPeg is
     /// @dev Reverts with {StaleReserveData} if the latest round is
     /// non-positive or older than {MAX_RESERVE_STALENESS}.
     function currentReserves() public view returns (uint256) {
-        (, int256 answer, , uint256 updatedAt,) = goldReserveOracle.latestRoundData();
+        (, int256 answer,, uint256 updatedAt,) = goldReserveOracle.latestRoundData();
         if (answer <= 0) revert StaleReserveData();
         if (block.timestamp - updatedAt > MAX_RESERVE_STALENESS) revert StaleReserveData();
 
@@ -192,7 +192,7 @@ contract AuroPeg is
     /// hard revert-on-stale behavior {currentReserves} uses for the
     /// reserve oracle that actually gates minting.
     function getGoldPriceUSD() external view returns (int256 price, uint256 updatedAt, bool isStale) {
-        (, price, , updatedAt,) = xauUsdPriceFeed.latestRoundData();
+        (, price,, updatedAt,) = xauUsdPriceFeed.latestRoundData();
         isStale = price <= 0 || block.timestamp - updatedAt > MAX_PRICE_STALENESS;
     }
 
